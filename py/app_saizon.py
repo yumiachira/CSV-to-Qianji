@@ -1,23 +1,39 @@
 # export_saizon.py
 import csv, sqlite3, os
-from py.common import open_csv_with_guess,lookup_category,ensure_columns,fuzzy_pick
-from py.config import DB_PATH,OUT_HEADERS,FIX_TYPE,DEFAULT_CAT
-from py.config import SAIZON_COL_DATE,SAIZON_COL_MERCHANT,SAIZON_COL_AMOUNT,SAIZON_COL_NOTE,SAIZON_FIX_ACCOUNT
-from py.set_name import SAIZON_INPUT_CSV,SAIZON_OUTPUT_CSV
+from py.common import (
+    open_csv_with_guess,
+    lookup_category,
+    ensure_columns,
+    fuzzy_pick
+    )
+from py.config import (
+    DB_PATH,
+    OUT_HEADERS,
+    FIX_TYPE,
+    DEFAULT_CAT
+    )
+from py.config import (
+    SAIZON_COL_DATE,
+    SAIZON_COL_MERCHANT,
+    SAIZON_COL_AMOUNT,
+    SAIZON_COL_NOTE,
+    SAIZON_FIX_ACCOUNT
+    )
 
-def main():
+def outputCSV(csv_file,output_csvname):
+
     if not os.path.exists(DB_PATH):
         raise FileNotFoundError(f"未找到数据库文件: {os.path.abspath(DB_PATH)}")
 
     conn = sqlite3.connect(DB_PATH)
 
-    f_in, reader = open_csv_with_guess(SAIZON_INPUT_CSV)
+    f_in, reader = open_csv_with_guess(csv_file)
 
     # 校验必需列
     need_cols = [SAIZON_COL_DATE, SAIZON_COL_MERCHANT, SAIZON_COL_AMOUNT, SAIZON_COL_NOTE]
     ensure_columns(reader, need_cols)
 
-    with f_in, open(SAIZON_OUTPUT_CSV, "w", newline="", encoding="utf-8") as f_out:
+    with f_in, open(output_csvname, "w", newline="", encoding="utf-8") as f_out:
         writer = csv.DictWriter(f_out, fieldnames=OUT_HEADERS)
         writer.writeheader()
 
@@ -36,7 +52,6 @@ def main():
             else:
                 remark = merchant
 
-            #cat, subcat = lookup_category(conn, merchant)
             # 先判断是否属于四个“模糊匹配”关键词之一
             alias = fuzzy_pick(merchant)
             if alias:
@@ -72,4 +87,4 @@ def main():
             writer.writerow(out_row)
 
     conn.close()
-    print(f"✅ 已生成: {os.path.abspath(SAIZON_OUTPUT_CSV)}")
+    print(f"🔸 已生成: {os.path.abspath(output_csvname)}")

@@ -1,4 +1,5 @@
 import csv,re,unicodedata
+
 DEFAULT_CAT = "默认"
 _RE_ZEN_NUM = r"[０-９]+"
 
@@ -87,3 +88,30 @@ def normalize_for_lookup(s: str) -> str:
     if re.fullmatch(_RE_ZEN_NUM + r"月分保証料", s):
         return "月分保証料"
     return s
+
+
+
+def normalize_date(date_str: str) -> str:
+    """
+    把各种类似：
+        2025年1月5日
+        2025/01/05
+        2025-1-5
+        2025.1.5
+    统一转换成：20250105（YYYYMMDD）
+    """
+    if not date_str:
+        return ""
+
+    s = date_str.strip()
+
+    # 抓出 年、月、日
+    m = re.match(r'^(\d{4})\D+(\d{1,2})\D+(\d{1,2})', s)
+    if not m:
+        return s  # 不符合日期格式就原样返回
+
+    year = int(m.group(1))
+    month = int(m.group(2))
+    day = int(m.group(3))
+
+    return f"{year:04d}{month:02d}{day:02d}"
