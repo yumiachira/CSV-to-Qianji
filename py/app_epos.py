@@ -1,22 +1,43 @@
 # export_saizon.py
 import csv, sqlite3, os
-from py.common import open_csv_with_guess,lookup_category,ensure_columns,fuzzy_pick,normalize_for_lookup
-from py.config import DB_PATH,OUT_HEADERS,FIX_TYPE,DEFAULT_CAT
-from py.config import EPOS_COL_TYPE,EPOS_COL_DATE,EPOS_COL_PLACE,EPOS_COL_CONTENT,EPOS_COL_AMOUNT,EPOS_COL_PAY_KBN,EPOS_COL_START_MONTH,EPOS_COL_NOTE,EPOS_FIX_ACCOUNT
-from py.set_name import EPOS_INPUT_CSV,EPOS_OUTPUT_CSV
+from py.common import (
+    open_csv_with_guess,
+    lookup_category,
+    ensure_columns,
+    fuzzy_pick,
+    normalize_for_lookup
+    )
+from py.config import (
+    DB_PATH,
+    OUT_HEADERS,
+    FIX_TYPE,
+    DEFAULT_CAT
+    )
+from py.config import (
+    EPOS_COL_TYPE,
+    EPOS_COL_DATE,
+    EPOS_COL_PLACE,
+    EPOS_COL_CONTENT,
+    EPOS_COL_AMOUNT,
+    EPOS_COL_PAY_KBN,
+    EPOS_COL_START_MONTH,
+    EPOS_COL_NOTE,
+    EPOS_FIX_ACCOUNT
+    )
 
-def main():
+def outputCSV(csv_file,output_csvname):
+
     if not os.path.exists(DB_PATH):
         raise FileNotFoundError(f"未找到数据库文件: {os.path.abspath(DB_PATH)}")
 
     conn = sqlite3.connect(DB_PATH)
-    f_in, reader = open_csv_with_guess(EPOS_INPUT_CSV)
+    f_in, reader = open_csv_with_guess(csv_file)
 
     # 校验必需列
     need_cols = [EPOS_COL_TYPE, EPOS_COL_DATE, EPOS_COL_PLACE, EPOS_COL_CONTENT, EPOS_COL_AMOUNT, EPOS_COL_PAY_KBN, EPOS_COL_START_MONTH, EPOS_COL_NOTE]
     ensure_columns(reader, need_cols)
 
-    with f_in, open(EPOS_OUTPUT_CSV, "w", newline="", encoding="utf-8") as f_out:
+    with f_in, open(output_csvname, "w", newline="", encoding="utf-8") as f_out:
         writer = csv.DictWriter(f_out, fieldnames=OUT_HEADERS)
         writer.writeheader()
 
@@ -84,4 +105,4 @@ def main():
             writer.writerow(out_row)
 
     conn.close()
-    print(f"✅ 已生成: {os.path.abspath(EPOS_OUTPUT_CSV)}")
+    print(f"🔸 已生成: {os.path.abspath(output_csvname)}")
