@@ -4,3 +4,8 @@ py/__pycache__/app_saizon.cpython-313.pyc
 py/__pycache__/common.cpython-313.pyc
 py/__pycache__/config.cpython-313.pyc
 py/__pycache__/set_name.cpython-313.pyc
+input/inputFile_epos_202501-202510.csv
+input/inputFile_paypay_202501-202509.csv
+input/inputFile_saizon_202501-202509.csv
+db/ledger.db
+__pycache__/insertSQL.cpython-313.pyc
