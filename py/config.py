@@ -10,7 +10,6 @@ CREATE TABLE IF NOT EXISTS merchant_catalog (
 """
 
 
-ENCODING = "utf-8-sig"
 INPUT_DIR = "./input"
 OUTPUT_DIR = "./output"
 DATE_COL_CANDIDATES = ["利用日", "利用日/キャンセル日", "ご利用年月日"]

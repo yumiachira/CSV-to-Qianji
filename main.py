@@ -4,13 +4,13 @@ import insertSQL
 import py.app_saizon as app_saizon
 import py.app_epos as app_epos
 import py.app_paypay as app_paypay
+import chardet
 from py.common import normalize_date
 from py.config import (
     DATE_COL_CANDIDATES,
     SAIZON_HEADER_SAIZON,
     PAYPAY_HEADER_SAIZON,
     EPOS_HEADER_SAIZON,
-    ENCODING,
     INPUT_DIR,
     OUTPUT_DIR
     )
@@ -36,7 +36,12 @@ def process_file(csv_file: Path):
     """处理单个 CSV 文件"""
     print(f"\n正在处理: {csv_file}")
 
-    with csv_file.open("r", encoding=ENCODING, newline="") as f:
+    # 自动检测
+    with csv_file.open("rb") as fb:
+        raw = fb.read()
+        enc = chardet.detect(raw)["encoding"] or "cp932"
+
+    with csv_file.open("r", encoding=enc, newline="") as f:
         reader = csv.reader(f)
 
         # 1. 读取表头
