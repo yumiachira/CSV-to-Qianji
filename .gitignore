@@ -6,4 +6,5 @@ py/__pycache__/config.cpython-313.pyc
 py/__pycache__/set_name.cpython-313.pyc
 input/
 output/
+db/ledger.db
 __pycache__/insertSQL.cpython-313.pyc
