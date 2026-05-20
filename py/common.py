@@ -78,7 +78,7 @@ def strip_paypay_prefix(name: str) -> str:
 
     return s.strip()  # 只去除首尾空白，中间不动
 
-# app_paypay.py专用
+# app_epos.py专用
 # 规则：若是「全角数字+月分家賃/保証料」，则仅保留「月分家賃/月分保証料」作为查库键
 def normalize_for_lookup(s: str) -> str:
     s = s or ""

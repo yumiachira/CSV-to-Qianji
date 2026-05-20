@@ -10,6 +10,8 @@ from py.config import (
     DB_PATH,
     OUT_HEADERS,
     FIX_TYPE,
+    PAY_TYPE,
+    CAT_REFUND,
     DEFAULT_CAT
     )
 from py.config import (
@@ -68,12 +70,20 @@ def outputCSV(csv_file,output_csvname):
                     cat, subcat = hit
                 else:
                     cat, subcat = DEFAULT_CAT, ""
+                    
+            # 注意：SAIZON卡账单没有收入，金额为负数时视为退款
+            if amount<"0":
+                trans_type = PAY_TYPE
+                cat = CAT_REFUND  # 退款类交易强制分类为「退款」
+                subcat = ""
+            else:
+                trans_type = FIX_TYPE
 
             out_row = {
                 "时间": date_val,
                 "分类": cat,
                 "二级分类": subcat,
-                "类型": FIX_TYPE,
+                "类型": trans_type,
                 "金额": amount,
                 "账户1": SAIZON_FIX_ACCOUNT,
                 "账户2": "",
