@@ -1,5 +1,12 @@
 from pathlib import Path
 import csv
+import os
+import sys
+# 如果是 exe 运行，切换到项目根目录
+if getattr(sys, "frozen", False):
+    os.chdir(Path(sys.executable).parent.parent)
+print("当前目录:", os.getcwd())
+
 import insertSQL
 import py.app_saizon as app_saizon
 import py.app_epos as app_epos

@@ -18,7 +18,7 @@ from py.db_manager import (
 
 def get_project_root():
     if getattr(sys, "frozen", False):
-        return Path(sys.executable).parent
+        return Path(sys.executable).parent.parent
     return Path(__file__).parent
 
 PROJECT_ROOT = get_project_root()
