@@ -39,11 +39,6 @@ def outputCSV(csv_file,output_csvname, check_only=False):
     need_cols = [EPOS_COL_TYPE, EPOS_COL_DATE, EPOS_COL_PLACE, EPOS_COL_CONTENT, EPOS_COL_AMOUNT, EPOS_COL_PAY_KBN, EPOS_COL_START_MONTH, EPOS_COL_NOTE]
     ensure_columns(reader, need_cols)
 
-    #pending_names = []
-    #with f_in, open(output_csvname, "w", newline="", encoding="utf-8") as f_out:
-    #    writer = csv.DictWriter(f_out, fieldnames=OUT_HEADERS)
-    #    writer.writeheader()
-
     pending_names = []
 
     if not check_only:
@@ -55,9 +50,6 @@ def outputCSV(csv_file,output_csvname, check_only=False):
         writer = None
 
     with f_in:
-
-
-
         for row in reader:
             type_val   = (row.get(EPOS_COL_TYPE) or "").strip()
             date_val   = (row.get(EPOS_COL_DATE) or "").strip()
@@ -131,11 +123,6 @@ def outputCSV(csv_file,output_csvname, check_only=False):
                 pending_names.append(remark)
             if not check_only:
                 writer.writerow(out_row)
-           #writer.writerow(out_row)
-
-   # conn.close()
-    #print(f"🔸 已生成: {os.path.abspath(output_csvname)}")
-    #return pending_names
 
     if f_out:
         f_out.close()
