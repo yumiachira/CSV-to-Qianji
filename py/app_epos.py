@@ -27,7 +27,7 @@ from py.config import (
     EPOS_FIX_ACCOUNT
     )
 
-def outputCSV(csv_file,output_csvname):
+def outputCSV(csv_file,output_csvname, check_only=False):
 
     if not os.path.exists(DB_PATH):
         raise FileNotFoundError(f"未找到数据库文件: {os.path.abspath(DB_PATH)}")
@@ -39,10 +39,24 @@ def outputCSV(csv_file,output_csvname):
     need_cols = [EPOS_COL_TYPE, EPOS_COL_DATE, EPOS_COL_PLACE, EPOS_COL_CONTENT, EPOS_COL_AMOUNT, EPOS_COL_PAY_KBN, EPOS_COL_START_MONTH, EPOS_COL_NOTE]
     ensure_columns(reader, need_cols)
 
+    #pending_names = []
+    #with f_in, open(output_csvname, "w", newline="", encoding="utf-8") as f_out:
+    #    writer = csv.DictWriter(f_out, fieldnames=OUT_HEADERS)
+    #    writer.writeheader()
+
     pending_names = []
-    with f_in, open(output_csvname, "w", newline="", encoding="utf-8") as f_out:
+
+    if not check_only:
+        f_out = open(output_csvname, "w", newline="", encoding="utf-8")
         writer = csv.DictWriter(f_out, fieldnames=OUT_HEADERS)
         writer.writeheader()
+    else:
+        f_out = None
+        writer = None
+
+    with f_in:
+
+
 
         for row in reader:
             type_val   = (row.get(EPOS_COL_TYPE) or "").strip()
@@ -115,8 +129,20 @@ def outputCSV(csv_file,output_csvname):
             }
             if cat == DEFAULT_CAT and trans_type == FIX_TYPE:
                 pending_names.append(remark)
-            writer.writerow(out_row)
+            if not check_only:
+                writer.writerow(out_row)
+           #writer.writerow(out_row)
+
+   # conn.close()
+    #print(f"🔸 已生成: {os.path.abspath(output_csvname)}")
+    #return pending_names
+
+    if f_out:
+        f_out.close()
 
     conn.close()
-    print(f"🔸 已生成: {os.path.abspath(output_csvname)}")
+
+    if not check_only:
+        print(f"🔸 已生成: {os.path.abspath(output_csvname)}")
+
     return pending_names

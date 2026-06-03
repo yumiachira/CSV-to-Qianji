@@ -22,7 +22,7 @@ from py.config import (
     PAYPAY_FIX_ACCOUNT
     )
 
-def outputCSV(csv_file,output_csvname):
+def outputCSV(csv_file,output_csvname, check_only=False):
 
     if not os.path.exists(DB_PATH):
         raise FileNotFoundError(f"未找到数据库文件: {os.path.abspath(DB_PATH)}")
@@ -33,74 +33,101 @@ def outputCSV(csv_file,output_csvname):
     ensure_columns(reader, need_cols)
 
     pending_names = []
-    with f_in, open(output_csvname, "w", newline="", encoding="utf-8") as f_out:
+    #with f_in, open(output_csvname, "w", newline="", encoding="utf-8") as f_out:
+       # writer = csv.DictWriter(f_out, fieldnames=OUT_HEADERS)
+       # writer.writeheader()
+
+    if check_only:
+        f_out = None
+        writer = None
+    else:
+        f_out = open(output_csvname, "w", newline="", encoding="utf-8")
         writer = csv.DictWriter(f_out, fieldnames=OUT_HEADERS)
         writer.writeheader()
 
-        for row in reader:
-            # 读取原值
-            date_val   = (row.get(PAYPAY_COL_DATE) or "").strip()
-            merchant   = (row.get(PAYPAY_COL_MERCHANT) or "").strip()
-            paytype    = (row.get(PAYPAY_COL_PAYTYPE) or "").strip()
-            amount     = (row.get(PAYPAY_COL_AMOUNT) or "").strip()
+        try:
+            with f_in:
+                for row in reader:
+                    # 读取原值
+                    date_val   = (row.get(PAYPAY_COL_DATE) or "").strip()
+                    merchant   = (row.get(PAYPAY_COL_MERCHANT) or "").strip()
+                    paytype    = (row.get(PAYPAY_COL_PAYTYPE) or "").strip()
+                    amount     = (row.get(PAYPAY_COL_AMOUNT) or "").strip()
 
-            # 跳过可能残留的表头行
-            if date_val == PAYPAY_COL_DATE:
-                continue
+                    # 跳过可能残留的表头行
+                    if date_val == PAYPAY_COL_DATE:
+                        continue
 
-            # 输出需要的固定/映射字段
-            out_time   = date_val
-            out_type   = FIX_TYPE
-            out_amount = amount
-            out_acc1   = f"{PAYPAY_FIX_ACCOUNT}{paytype}".strip()  # 账户1 = "PAYPAY" + 支払区分
-            out_remark = merchant                     # 备注 = 原始「利用店名・商品名」
+                    # 输出需要的固定/映射字段
+                    out_time   = date_val
+                    out_type   = FIX_TYPE
+                    out_amount = amount
+                    out_acc1   = f"{PAYPAY_FIX_ACCOUNT}{paytype}".strip()  # 账户1 = "PAYPAY" + 支払区分
+                    out_remark = merchant                     # 备注 = 原始「利用店名・商品名」
 
-            # —— 分类前处理：先去 PayPay 前缀
-            merchant_key = strip_paypay_prefix(merchant)
-            #Debug print(f"[DEBUG] 原商户: {merchant}  →  清洗后用于匹配: {merchant_key}")
+                    # —— 分类前处理：先去 PayPay 前缀
+                    merchant_key = strip_paypay_prefix(merchant)
+                    #Debug print(f"[DEBUG] 原商户: {merchant}  →  清洗后用于匹配: {merchant_key}")
 
-            # —— 先试四类模糊；命中则用规范词去查库；否则用清洗后的原名查库
-            alias = fuzzy_pick(merchant_key)
-            if alias:
-                hit = lookup_category(conn, alias)
-                if hit:
-                    cat, subcat = hit
-                else:
-                    cat, subcat = DEFAULT_CAT, ""
-            else:
-                hit = lookup_category(conn, merchant_key)
-                if hit:
-                    cat, subcat = hit
-                else:
-                    cat, subcat = DEFAULT_CAT, ""
+                    # —— 先试四类模糊；命中则用规范词去查库；否则用清洗后的原名查库
+                    alias = fuzzy_pick(merchant_key)
+                    if alias:
+                        hit = lookup_category(conn, alias)
+                        if hit:
+                            cat, subcat = hit
+                        else:
+                            cat, subcat = DEFAULT_CAT, ""
+                    else:
+                        hit = lookup_category(conn, merchant_key)
+                        if hit:
+                            cat, subcat = hit
+                        else:
+                            cat, subcat = DEFAULT_CAT, ""
 
-            # 注意：PAYPAY账单没有收入，金额为负数时视为退款
-            if amount<"0":
-                trans_type = PAY_TYPE
-                cat = CAT_REFUND  # 退款类交易强制分类为「退款」
-                subcat = ""
-            else:
-                trans_type = FIX_TYPE
+                    # 注意：PAYPAY账单没有收入，金额为负数时视为退款
+                    if amount<"0":
+                        trans_type = PAY_TYPE
+                        cat = CAT_REFUND  # 退款类交易强制分类为「退款」
+                        subcat = ""
+                    else:
+                        trans_type = FIX_TYPE
 
-            out_row = {
-                "时间": out_time,
-                "分类": cat,
-                "二级分类": subcat,
-                "类型": trans_type,
-                "金额": out_amount,
-                "账户1": out_acc1,
-                "账户2": "",
-                "备注": out_remark,
-                "账单标记": "",
-                "手续费": "",
-                "优惠券": "",
-                "标签": "",
-                "账单图片": ""
-            }
-            if cat == DEFAULT_CAT and trans_type == FIX_TYPE:
-                pending_names.append(out_remark)
-            writer.writerow(out_row)
+                    out_row = {
+                        "时间": out_time,
+                        "分类": cat,
+                        "二级分类": subcat,
+                        "类型": trans_type,
+                        "金额": out_amount,
+                        "账户1": out_acc1,
+                        "账户2": "",
+                        "备注": out_remark,
+                        "账单标记": "",
+                        "手续费": "",
+                        "优惠券": "",
+                        "标签": "",
+                        "账单图片": ""
+                    }
+                   # if cat == DEFAULT_CAT and trans_type == FIX_TYPE:
+                    #    pending_names.append(out_remark)
+                    #writer.writerow(out_row)
 
-    conn.close()
-    print(f"🔸 已生成: {os.path.abspath(output_csvname)}")
-    return pending_names
+                    if cat == DEFAULT_CAT and trans_type == FIX_TYPE:
+                        pending_names.append(out_remark)
+
+                    if not check_only:
+                        writer.writerow(out_row)
+
+
+        finally:
+            if f_out:
+                f_out.close()
+            conn.close()
+        
+        if not check_only:
+            print(f"🔸 已生成: {os.path.abspath(output_csvname)}")
+
+        return pending_names
+
+   # conn.close()
+    #print(f"🔸 已生成: {os.path.abspath(output_csvname)}")
+    #return pending_names

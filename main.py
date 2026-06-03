@@ -34,7 +34,8 @@ def find_date_col(headers):
             return col, headers.index(col)
     return None, -1
 
-def process_file(csv_file: Path):
+#def process_file(csv_file: Path):
+def process_file(csv_file: Path, check_only=False):
     """处理单个 CSV 文件"""
     print(f"\n正在处理: {csv_file}")
 
@@ -97,7 +98,8 @@ def process_file(csv_file: Path):
         print(f"输出文件: {output_path}")
 
         # 6. 调用对应 app 的输出函数
-        pending = handler(str(csv_file), str(output_path))
+        pending = handler(str(csv_file), str(output_path), check_only=check_only)
+        #pending = handler(str(csv_file), str(output_path))
         return pending or []
 
 def run():
@@ -115,16 +117,27 @@ def run():
     all_pending = []
     for csv_file in csv_paths:
         try:
-            all_pending.extend(process_file(csv_file))
+            all_pending.extend(process_file(csv_file, check_only=True))
         except Exception as e:
             # 防止一个文件异常把整个流程弄崩
             print(f"⚠️ 处理文件 {csv_file} 时出错: {e}")
 
-    if all_pending:
-        unique_pending = list(dict.fromkeys(all_pending))
-        print("\n🔔 发现待补全的默认分类备注，正在打开 UpdateDB 页面...")
+    unique_pending = list(dict.fromkeys(all_pending))
+
+    if unique_pending:
+        print("\n🔔 发现待补全的默认分类备注，不生成 CSV，正在打开 UpdateDB 页面...")
         web_update_db.set_pending_names(unique_pending)
         web_update_db.run_server()
+        return
+
+    # 第2遍：没有 pending，正式生成文件
+    print("\n✅ 默认分类完整，开始生成 CSV 文件...")
+
+    for csv_file in csv_paths:
+        try:
+            process_file(csv_file, check_only=False)
+        except Exception as e:
+            print(f"⚠️ 处理文件 {csv_file} 时出错: {e}")
 
 if __name__ == "__main__":
     run()
