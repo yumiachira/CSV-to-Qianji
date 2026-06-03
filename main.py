@@ -106,8 +106,41 @@ def process_file(csv_file: Path, check_only=False):
 
         # 6. 调用对应 app 的输出函数
         pending = handler(str(csv_file), str(output_path), check_only=check_only)
-        #pending = handler(str(csv_file), str(output_path))
         return pending or []
+
+def get_csv_paths():
+    csv_paths = list(Path(INPUT_DIR).glob("*.csv"))
+
+    if not csv_paths:
+        print("⚠️ 没有找到任何 CSV 文件")
+
+    return csv_paths
+
+
+def check_pending():
+    """只检查是否有默认分类，不生成 CSV"""
+    csv_paths = get_csv_paths()
+    all_pending = []
+
+    for csv_file in csv_paths:
+        try:
+            all_pending.extend(process_file(csv_file, check_only=True))
+        except Exception as e:
+            print(f"⚠️ 检查文件 {csv_file} 时出错: {e}")
+
+    return list(dict.fromkeys(all_pending))
+
+
+def generate_csv():
+    """正式生成 CSV"""
+    csv_paths = get_csv_paths()
+
+    for csv_file in csv_paths:
+        try:
+            process_file(csv_file, check_only=False)
+        except Exception as e:
+            print(f"⚠️ 处理文件 {csv_file} 时出错: {e}")
+
 
 def run():
     """入口函数：扫描 input 下所有 csv 并处理"""
@@ -116,20 +149,11 @@ def run():
 
     Path(OUTPUT_DIR).mkdir(parents=True, exist_ok=True)
 
-    csv_paths = list(Path(INPUT_DIR).glob("*.csv"))
+    csv_paths = get_csv_paths()
     if not csv_paths:
-        print("⚠️ 没有找到任何 CSV 文件")
         return
 
-    all_pending = []
-    for csv_file in csv_paths:
-        try:
-            all_pending.extend(process_file(csv_file, check_only=True))
-        except Exception as e:
-            # 防止一个文件异常把整个流程弄崩
-            print(f"⚠️ 处理文件 {csv_file} 时出错: {e}")
-
-    unique_pending = list(dict.fromkeys(all_pending))
+    unique_pending = check_pending()
 
     if unique_pending:
         print("\n🔔 发现待补全的默认分类备注，不生成 CSV，正在打开 UpdateDB 页面...")
@@ -137,14 +161,8 @@ def run():
         web_update_db.run_server()
         return
 
-    # 第2遍：没有 pending，正式生成文件
     print("\n✅ 默认分类完整，开始生成 CSV 文件...")
-
-    for csv_file in csv_paths:
-        try:
-            process_file(csv_file, check_only=False)
-        except Exception as e:
-            print(f"⚠️ 处理文件 {csv_file} 时出错: {e}")
+    generate_csv()
 
 if __name__ == "__main__":
     run()

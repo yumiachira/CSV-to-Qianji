@@ -100,6 +100,29 @@ class UpdateDBRequestHandler(SimpleHTTPRequestHandler):
             sync_db()
             self._send_json({"status": "ok"})
             return
+        if self.path == "/api/generate_csv":
+            import main
+
+            sync_db()
+
+            pending = main.check_pending()
+
+            if pending:
+                set_pending_names(pending)
+                self._send_json({
+                    "status": "pending",
+                    "message": "还有未分类项目，请先补全分类。",
+                    "pending": pending
+                })
+                return
+
+            main.generate_csv()
+
+            self._send_json({
+                "status": "ok",
+                "message": "CSV 已生成完成。"
+            })
+            return
         self.send_error(404, "Not Found")
 
     def _send_json(self, data, status=200):

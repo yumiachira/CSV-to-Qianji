@@ -72,6 +72,7 @@
             <button class="secondary" onclick="reloadDatabase()">同步数据库</button>
         </div>
         <div id="formStatus" class="status"></div>
+        <button onclick="generateCSV()">生成 CSV</button>
     </div>
 
     <div class="card">
@@ -326,6 +327,31 @@
                 formStatus.textContent = "同步失败：" + error.message;
             }
         }
+
+        async function generateCSV() {
+            formStatus.textContent = "正在检查分类并生成 CSV...";
+
+            try {
+                const result = await request("/api/generate_csv", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({})
+                });
+
+                if (result.status === "pending") {
+                    formStatus.textContent = "⚠️ 还有未分类项目，请先补全分类。";
+                    loadPending();
+                    loadRecords();
+                    return;
+                }
+
+                formStatus.textContent = "✅ CSV 已生成完成。";
+
+            } catch (error) {
+                formStatus.textContent = "生成 CSV 失败：" + error.message;
+            }
+        }
+
 
         loadPending();
         loadRecords();
