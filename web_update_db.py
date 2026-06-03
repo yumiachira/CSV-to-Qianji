@@ -53,6 +53,10 @@ class UpdateDBRequestHandler(SimpleHTTPRequestHandler):
             self._send_json(search_entries(query))
             return
         if path == "/api/pending":
+            import main
+            sync_db()
+            new_pending = main.check_pending()
+            set_pending_names(new_pending)
             self._send_json(pending_names)
             return
         if path == "/api/reload":
