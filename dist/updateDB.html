@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Update DB - table.csv 编辑器</title>
+    <style>
+        body { font-family: system-ui, sans-serif; margin: 0; padding: 20px; background: #f9f9fb; color: #222; }
+        h1, h2 { margin-top: 0; }
+        .card { background: #fff; border: 1px solid #ddd; border-radius: 10px; padding: 16px; margin-bottom: 16px; box-shadow: 0 2px 6px rgba(0,0,0,0.05); }
+        label { display: block; margin-top: 12px; font-weight: 600; }
+        input[type=text] { width: 100%; padding: 8px 10px; border: 1px solid #ccc; border-radius: 6px; margin-top: 4px; box-sizing: border-box; }
+        button { padding: 10px 16px; border: none; border-radius: 8px; cursor: pointer; margin-right: 8px; margin-top: 12px; }
+        button.primary { background: #2563eb; color: #fff; }
+        button.danger { background: #dc2626; color: #fff; }
+        button.secondary { background: #6b7280; color: #fff; }
+        table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+        th, td { padding: 10px 8px; border-bottom: 1px solid #e5e7eb; text-align: left; }
+        tr:hover { background: #f1f5f9; }
+        .tag-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+        .tag { padding: 8px 12px; background: #eef2ff; border-radius: 999px; cursor: pointer; }
+        .tag:hover { background: #c7d2fe; }
+        .status { margin-top: 10px; color: #111827; }
+        .section-title { display: flex; align-items: center; justify-content: space-between; }
+        .section-title small { color: #6b7280; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>table.csv 编辑器</h1>
+        <p>本页面可直接增删改查 <code>db/table.csv</code>，并同步更新数据库。</p>
+        <p>如果来自 main.py 的输出文件出现 <strong>类型=支出</strong> 且 <strong>分类=默认</strong> 的行，下面会显示这些备注（Name 字段待补全）。</p>
+    </div>
+
+    <div class="card">
+        <div class="section-title">
+            <div>
+                <h2>待处理备注</h2>
+                <small>点击备注可快速填入 Name 字段</small>
+            </div>
+            <button class="secondary" onclick="loadPending()">刷新</button>
+        </div>
+        <div id="pendingContainer" class="tag-list"></div>
+        <div id="pendingEmpty" style="color:#6b7280; margin-top:8px;">暂无待处理备注。</div>
+    </div>
+
+    <div class="card">
+        <h2>编辑记录</h2>
+        <label> Name
+            <input id="nameInput" type="text" placeholder="请输入商户或备注" />
+        </label>
+        <label> 类型type1
+        <select id="type1Input">
+            <option value="日用品">日用品</option>
+            <option value="食事">食事</option>
+            <option value="交通费">交通费</option>
+            <option value="外食">外食</option>
+            <option value="住居費">住居費</option>
+            <option value="住居費">医療費</option>
+            <option value="自己投資">自己投資</option>
+            <option value="娯楽費">娯楽費</option>
+            <option value="旅行">旅行</option>
+        </select>
+        </label>
+        <label>类型type2
+            <select id="type2Input"></select>
+        </label>
+        <div>
+            <button class="primary" onclick="addRecord()">新增</button>
+            <button class="primary" onclick="editRecord()">修改</button>
+            <button class="danger" onclick="deleteRecord()">删除</button>
+            <button class="secondary" onclick="reloadDatabase()">同步数据库</button>
+        </div>
+        <div id="formStatus" class="status"></div>
+    </div>
+
+    <div class="card">
+        <div class="section-title">
+            <div>
+                <h2>当前分类规则</h2>
+                <small>检索并查看 table.csv 内容</small>
+            </div>
+        </div>
+        <label>搜索 Name / type1 / type2
+            <input id="searchInput" type="text" placeholder="输入关键词过滤" oninput="loadRecords()" />
+        </label>
+        <table>
+            <thead>
+                <tr><th>Name</th><th>type1</th><th>type2</th></tr>
+            </thead>
+            <tbody id="recordsBody"></tbody>
+        </table>
+        <div id="tableStatus" class="status"></div>
+    </div>
+
+    <script>
+        const pendingContainer = document.getElementById("pendingContainer");
+        const pendingEmpty = document.getElementById("pendingEmpty");
+        const recordsBody = document.getElementById("recordsBody");
+        const formStatus = document.getElementById("formStatus");
+        const tableStatus = document.getElementById("tableStatus");
+        const nameInput = document.getElementById("nameInput");
+        const type1Input = document.getElementById("type1Input");
+        const type2Input = document.getElementById("type2Input");
+        const searchInput = document.getElementById("searchInput");
+
+        const type2Data = {
+                    日用品: [
+                        "MUJI",
+                        "Bigcamera",
+                        "Green bean",
+                        "ZARA",
+                        "Cosme",
+                        "Rifa",
+                        "Kaldi",
+                        "Pal Closet",
+                        "IKEA",
+                        "ドラックストア",
+                        "Nitori",
+                        "Pola",
+                        "首里石鹼",
+                        "Amazon"
+                    ],
+                    食事: [
+                        "スーパー",
+                        "AENO",
+                        "ローソン",
+                        "711",
+                        "Fami",
+                        "パンとコーヒー"
+                    ],
+                    交通费: [
+                        "Suica"
+                    ],
+                    外食: [
+                        "日本料理",
+                        "中華料理",
+                        "インド料理",
+                        "韓国料理",
+                        "フランス料理",
+                        "トルコ料理",
+                        "ベトナム料理",
+                        "タイ料理",
+                        "イタリア料理",
+                        "KFC",
+                        "Uber Eats"
+                    ],
+                    住居費: [
+                        "携帯料金",
+                        "家賃",
+                        "水道代",
+                        "電気代",
+                        "ガス代",
+                        "保証料"
+                    ],
+                    医療費: [
+                        "クリニック"
+                    ],
+                    自己投資: [
+                        "運動",
+                        "勉強",
+                        "理发",
+                        "ネイル"
+                    ],
+                    娯楽費: [
+                        "会員費",
+                        "チケット"
+                    ],
+                    旅行: [
+                        "旅行"
+                    ]
+                };
+        function updateType2Options() {
+            const selectedType1 = type1Input.value;
+
+            type2Input.innerHTML = "";
+
+            const options = type2Data[selectedType1] || [];
+
+            options.forEach(item => {
+                const option = document.createElement("option");
+                option.value = item;
+                option.textContent = item;
+                type2Input.appendChild(option);
+            });
+        }
+
+
+
+        type1Input.addEventListener("change", updateType2Options);
+        updateType2Options();
+
+        async function request(path, options = {}) {
+            const res = await fetch(path, options);
+            if (!res.ok) {
+                const text = await res.text();
+                throw new Error(text || `${res.status} ${res.statusText}`);
+            }
+            return path.startsWith("/api/") ? res.json() : res.text();
+        }
+
+        async function loadPending() {
+            try {
+                const names = await request("/api/pending");
+                pendingContainer.innerHTML = "";
+                if (!names.length) {
+                    pendingEmpty.style.display = "block";
+                    return;
+                }
+                pendingEmpty.style.display = "none";
+                names.forEach(name => {
+                    const span = document.createElement("span");
+                    span.className = "tag";
+                    span.textContent = name;
+                    span.addEventListener("click", () => {
+                        nameInput.value = name;
+                        type1Input.value = "";
+                        type2Input.innerHTML  = "";
+                        nameInput.scrollIntoView({ behavior: "smooth", block: "center" });
+                    });
+                    pendingContainer.appendChild(span);
+                });
+            } catch (error) {
+                pendingEmpty.textContent = "无法加载待处理备注：" + error.message;
+                pendingEmpty.style.display = "block";
+            }
+        }
+
+        async function loadRecords() {
+            try {
+                const q = encodeURIComponent(searchInput.value.trim());
+                const rows = await request(`/api/records?q=${q}`);
+                recordsBody.innerHTML = "";
+                if (!rows.length) {
+                    tableStatus.textContent = "没有匹配的记录。";
+                    return;
+                }
+                tableStatus.textContent = `共 ${rows.length} 条记录。`;
+                rows.forEach(row => {
+                    const tr = document.createElement("tr");
+                    const nameCell = document.createElement("td");
+                    const type1Cell = document.createElement("td");
+                    const type2Cell = document.createElement("td");
+                    nameCell.textContent = row.name;
+                    type1Cell.textContent = row.type1;
+                    type2Cell.textContent = row.type2;
+                    tr.appendChild(nameCell);
+                    tr.appendChild(type1Cell);
+                    tr.appendChild(type2Cell);
+                    tr.addEventListener("click", () => {
+                        nameInput.value = row.name;
+                        type1Input.value = row.type1;
+                        type2Input.value = row.type2;
+                    });
+                    recordsBody.appendChild(tr);
+                });
+            } catch (error) {
+                tableStatus.textContent = "加载记录失败：" + error.message;
+            }
+        }
+
+        async function addRecord() {
+            try {
+                await request("/api/add", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        name: nameInput.value.trim(),
+                        type1: type1Input.value.trim(),
+                        type2: type2Input.value.trim(),
+                    }),
+                });
+                formStatus.textContent = "✅ 已新增并同步数据库。";
+                loadRecords();
+                loadPending();
+            } catch (error) {
+                formStatus.textContent = "新增失败：" + error.message;
+            }
+        }
+
+        async function editRecord() {
+            try {
+                await request("/api/edit", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        name: nameInput.value.trim(),
+                        type1: type1Input.value.trim(),
+                        type2: type2Input.value.trim(),
+                    }),
+                });
+                formStatus.textContent = "✅ 已修改并同步数据库。";
+                loadRecords();
+                loadPending();
+            } catch (error) {
+                formStatus.textContent = "修改失败：" + error.message;
+            }
+        }
+
+        async function deleteRecord() {
+            if (!confirm("确认要删除当前 Name 吗？")) {
+                return;
+            }
+            try {
+                await request("/api/delete", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ name: nameInput.value.trim() }),
+                });
+                formStatus.textContent = "✅ 已删除并同步数据库。";
+                nameInput.value = "";
+                type1Input.value = "";
+                type2Input.value = "";
+                loadRecords();
+                loadPending();
+            } catch (error) {
+                formStatus.textContent = "删除失败：" + error.message;
+            }
+        }
+
+        async function reloadDatabase() {
+            try {
+                await request("/api/reload");
+                formStatus.textContent = "✅ 数据库已重新导入 table.csv。";
+            } catch (error) {
+                formStatus.textContent = "同步失败：" + error.message;
+            }
+        }
+
+        loadPending();
+        loadRecords();
+    </script>
+</body>
+</html>

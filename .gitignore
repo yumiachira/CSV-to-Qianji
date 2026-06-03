@@ -8,3 +8,6 @@ input/
 output/
 db/ledger.db
 __pycache__/insertSQL.cpython-313.pyc
+dist/db/ledger.db
+dist/db/table.csv
+db/table.csv

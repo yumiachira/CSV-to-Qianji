@@ -32,6 +32,7 @@ def outputCSV(csv_file,output_csvname):
     need_cols = [PAYPAY_COL_DATE, PAYPAY_COL_MERCHANT, PAYPAY_COL_PAYTYPE, PAYPAY_COL_AMOUNT]
     ensure_columns(reader, need_cols)
 
+    pending_names = []
     with f_in, open(output_csvname, "w", newline="", encoding="utf-8") as f_out:
         writer = csv.DictWriter(f_out, fieldnames=OUT_HEADERS)
         writer.writeheader()
@@ -96,7 +97,10 @@ def outputCSV(csv_file,output_csvname):
                 "标签": "",
                 "账单图片": ""
             }
+            if cat == DEFAULT_CAT and trans_type == FIX_TYPE:
+                pending_names.append(out_remark)
             writer.writerow(out_row)
 
     conn.close()
     print(f"🔸 已生成: {os.path.abspath(output_csvname)}")
+    return pending_names
