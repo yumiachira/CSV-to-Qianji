@@ -308,7 +308,7 @@
                     <h1>🏷 待处理商户</h1>
                     <p>当下方的待处理商户全部整理完成后，点击 【生成 CSV】 按钮，就可以将账本导出啦 ✨</p>
                 </div>
-                <button class="secondary" onclick="refreshAll()">刷新</button>
+                <button class="secondary" onclick="refreshAllbutton()">刷新</button>
             </div>
             <div id="pendingContainer" class="tag-list"></div>
             <div id="pendingEmpty" style="color:#131603; margin-top:8px;">暂无待处理商户。</div>
@@ -558,19 +558,60 @@
             await loadRecords();
         }
 
+        async function refreshAllbutton(showMessage = true) {
+            try {
+                await loadPending();
+                await loadRecords();
+
+                if (showMessage) {
+                    openCuteModal(
+                        "🍃刷新完成",
+                        "最新数据已经同步完成啦～"
+                    );
+                }
+
+            } catch (error) {
+                openCuteModal(
+                    "⚠️刷新失败",
+                    "刷新时发生错误：\n" + error.message
+                );
+            }
+        }
+
         async function addRecord() {
+            const name = nameInput.value.trim();
+            const type1 = type1Input.value.trim();
+            const type2 = type2Input.value.trim();
+
+            if (!name || !type1 || !type2) {
+                formStatus.textContent = "";
+
+                openCuteModal(
+                    "🌱还没有填完哦",
+                    "名称、类型1、类型2 都必须选择或填写。\n请全部填好后再新增。"
+                );
+
+                return;
+            }
+
             try {
                 await request("/api/add", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
-                        name: nameInput.value.trim(),
-                        type1: type1Input.value.trim(),
-                        type2: type2Input.value.trim(),
+                        name: name,
+                        type1: type1,
+                        type2: type2,
                     }),
                 });
-                formStatus.textContent = "✅ 已新增并同步数据库。";
+
+                formStatus.textContent = "";
+                openCuteModal(
+                    "🎉新增完成",
+                    "商户记录已经成功新增并同步数据库啦～"
+                );
                 await refreshAll();
+
             } catch (error) {
                 formStatus.textContent = "新增失败：" + error.message;
             }
@@ -595,20 +636,43 @@
         }
 
         async function deleteRecord() {
-            if (!confirm("确认要删除当前 Name 吗？")) {
+
+            const name = nameInput.value.trim();
+
+            if (!name) {
+                openCuteModal(
+                    "🌱还没有选择商户哦",
+                    "请先输入或选择一个名称，再执行删除。"
+                );
                 return;
             }
+
+            if (!confirm("确认要删除当前商户吗？")) {
+                return;
+            }
+
             try {
                 await request("/api/delete", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ name: nameInput.value.trim() }),
+                    body: JSON.stringify({
+                        name: name
+                    }),
                 });
-                formStatus.textContent = "✅ 已删除并同步数据库。";
+
+                formStatus.textContent = "";
+
+                openCuteModal(
+                    "🎉删除完成",
+                    "商户记录已经成功删除啦～"
+                );
+
                 nameInput.value = "";
                 type1Input.value = "";
                 type2Input.value = "";
+
                 await refreshAll();
+
             } catch (error) {
                 formStatus.textContent = "删除失败：" + error.message;
             }
