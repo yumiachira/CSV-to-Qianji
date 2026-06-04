@@ -41,72 +41,142 @@ def find_date_col(headers):
             return col, headers.index(col)
     return None, -1
 
-#def process_file(csv_file: Path):
 def process_file(csv_file: Path, check_only=False):
-    """处理单个 CSV 文件"""
+    # 跳过临时清洗文件
+    if csv_file.name.startswith("__cleaned_"):
+        return []
+
     print(f"\n正在处理: {csv_file}")
 
-    # 自动检测
+    # 0. 自动检测编码
     with csv_file.open("rb") as fb:
         raw = fb.read()
         enc = chardet.detect(raw)["encoding"] or "cp932"
 
     with csv_file.open("r", encoding=enc, newline="") as f:
         reader = csv.reader(f)
+        all_rows = list(reader)
 
-        # 1. 读取表头
+    if not all_rows:
+        print("⚠️ 文件为空，跳过")
+        return []
+
+    # 1. 自动寻找真正的表头行
+    header_idx = None
+    headers = None
+    type_name = None
+    handler = None
+    label = None
+
+    for i, row in enumerate(all_rows[:20]):
+        temp_headers = [h.strip() for h in row]
+
+        tmp_type_name, tmp_handler, tmp_label = detect_type(temp_headers)
+
+        if tmp_type_name:
+            header_idx = i
+            headers = temp_headers
+            type_name = tmp_type_name
+            handler = tmp_handler
+            label = tmp_label
+            break
+
+    if header_idx is None:
+        print("⚠️ 未匹配到已知的账单表头，跳过")
+        return []
+
+    print(f"检测到 {label} 账单格式")
+    print(f"表头行位置: 第 {header_idx + 1} 行")
+
+    # 2. 查找日期列
+    date_col_name, date_idx = find_date_col(headers)
+    if date_col_name is None:
+        print("⚠️ 未找到日期列（利用日 / 利用日/キャンセル日 / ご利用年月日），跳过")
+        return []
+
+    print(f"检测到日期列: {date_col_name}（索引: {date_idx}）")
+
+    # 3. 数据行：从真实表头下一行开始
+    rows = []
+
+    skip_keywords = [
+        "合計",
+        "※",
+        "（＊",
+        "円換算レート",
+        "セゾン投信(株"
+    ]
+
+    for row in all_rows[header_idx + 1:]:
+
+        # 空行跳过
+        if not any(cell.strip() for cell in row):
+            continue
+
+        # 整行拼接成字符串用于判断
+        row_text = ",".join(cell.strip() for cell in row)
+
+        # 合计行、说明行、汇率说明行跳过
+        if any(keyword in row_text for keyword in skip_keywords):
+            continue
+
+        raw_date = row[date_idx] if len(row) > date_idx else ""
+        norm_date = normalize_date(raw_date)
+
+        # 没有日期的跳过
+        if not norm_date:
+            continue
+
+        rows.append(row)
+
+    if not rows:
+        print("⚠️ 没有有效明细行，跳过")
+        return []
+
+    # 4. 第一条明细日期
+    first_row = rows[0]
+    first_raw = first_row[date_idx] if len(first_row) > date_idx else ""
+    first_date = normalize_date(first_raw)
+
+    # 5. 最后一条明细日期
+    last_row = rows[-1]
+    last_raw = last_row[date_idx] if len(last_row) > date_idx else ""
+    last_date = normalize_date(last_raw)
+
+    if not first_date or not last_date:
+        print(f"⚠️ 无法规范化日期（first={first_raw}, last={last_raw}），跳过")
+        return []
+
+    print(f"第一行日期: {first_date}")
+    print(f"最后一行日期: {last_date}")
+
+    # 6. 生成输出路径
+    output_path = Path(OUTPUT_DIR) / f"output_{type_name}_{first_date}-{last_date}.csv"
+    print(f"输出文件: {output_path}")
+
+    # 7. 生成临时清洗版 CSV
+    cleaned_path = csv_file.parent / f"__cleaned_{csv_file.name}"
+
+    with cleaned_path.open("w", encoding="utf-8-sig", newline="") as wf:
+        writer = csv.writer(wf)
+
+        # 写表头
+        writer.writerow(headers)
+
+        # 写过滤后的有效数据
+        writer.writerows(rows)
+
+    # 8. 调用对应 app 的输出函数
+    try:
+        pending = handler(str(cleaned_path), str(output_path), check_only=check_only)
+    finally:
+        # 9. 删除临时文件
         try:
-            headers = next(reader)
-        except StopIteration:
-            print("⚠️ 文件为空，跳过")
-            return []
+            cleaned_path.unlink()
+        except Exception:
+            pass
 
-        headers = [h.strip() for h in headers]
-
-        # 2. 判定账单类型
-        type_name, handler, label = detect_type(headers)
-        if not type_name:
-            print("⚠️ 未匹配到已知的账单表头，跳过")
-            return []
-        print(f"检测到 {label} 账单格式")
-
-        # 3. 查找日期列
-        date_col_name, date_idx = find_date_col(headers)
-        if date_col_name is None:
-            print("⚠️ 未找到日期列（利用日 / 利用日/キャンセル日 / ご利用年月日），跳过")
-            return []
-        print(f"检测到日期列: {date_col_name}（索引: {date_idx}）")
-
-        # 4. 数据行（跳过空行）
-        rows = [row for row in reader if any(cell.strip() for cell in row)]
-        if not rows:
-            print("⚠️ 没有数据行（只有表头），跳过")
-            return []
-
-        # 第一条明细
-        first_row = rows[0]
-        first_raw = first_row[date_idx] if len(first_row) > date_idx else ""
-        first_date = normalize_date(first_raw)
-
-        # 最后一条明细
-        last_row = rows[-1]
-        last_raw = last_row[date_idx] if len(last_row) > date_idx else ""
-        last_date = normalize_date(last_raw)
-
-        if not first_date or not last_date:
-            print(f"⚠️ 无法规范化日期（first={first_raw}, last={last_raw}），跳过")
-            return []
-
-        print(f"第一行日期: {first_date}")
-        print(f"最后一行日期: {last_date}")
-
-        # 5. 生成输出路径
-        output_path = Path(OUTPUT_DIR) / f"output_{type_name}_{first_date}-{last_date}.csv"
-        print(f"输出文件: {output_path}")
-
-        # 6. 调用对应 app 的输出函数
-        pending = handler(str(csv_file), str(output_path), check_only=check_only)
-        return pending or []
+    return pending or []
 
 def get_csv_paths():
     csv_paths = list(Path(INPUT_DIR).glob("*.csv"))
